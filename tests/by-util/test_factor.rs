@@ -128,7 +128,7 @@ fn test_first_1000_integers_with_exponents() {
         .succeeds();
 
     // Using factor from GNU Coreutils 9.2
-    // `seq 0 1000 | factor | sha1sum` => "45f5f758a9319870770bd1fec2de23d54331944d"
+    // `seq 0 1000 | factor -h | sha1sum` => "45f5f758a9319870770bd1fec2de23d54331944d"
     let mut hasher = Sha1::new();
     hasher.update(result.stdout());
     let hash_check = hasher.finalize();
