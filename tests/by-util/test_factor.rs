@@ -108,7 +108,6 @@ fn test_first_1000_integers() {
 
 #[test]
 fn test_first_1000_integers_with_exponents() {
-    extern crate sha1;
     use hex_literal::hex;
     use sha1::{Digest, Sha1};
 
