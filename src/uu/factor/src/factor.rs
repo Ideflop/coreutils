@@ -70,22 +70,16 @@ impl PartialEq for Decomposition {
 impl Eq for Decomposition {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Factors {
-    decomposition: RefCell<Decomposition>,
-    print_exponents: bool,
-}
+pub struct Factors(RefCell<Decomposition>);
 
 impl Factors {
-    pub fn one(print_exponents: bool) -> Self {
-        Self {
-            decomposition: RefCell::new(Decomposition::one()),
-            print_exponents,
-        }
+    pub fn one() -> Self {
+        Self(RefCell::new(Decomposition::one()))
     }
 
     pub fn add(&mut self, prime: u64, exp: Exponent) {
         debug_assert!(miller_rabin::is_prime(prime));
-        self.decomposition.borrow_mut().add(prime, exp);
+        self.0.borrow_mut().add(prime, exp);
     }
 
     pub fn push(&mut self, prime: u64) {
@@ -94,17 +88,18 @@ impl Factors {
 
     #[cfg(test)]
     fn product(&self) -> u64 {
-        self.decomposition.borrow().product()
+        self.0.borrow().product()
     }
 }
 
 impl fmt::Display for Factors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let v = &mut (self.decomposition).borrow_mut().0;
+        let v = &mut (self.0).borrow_mut().0;
         v.sort_unstable();
 
+        let include_exponents = f.alternate();
         for (p, exp) in v.iter() {
-            if self.print_exponents && *exp > 1 {
+            if include_exponents && *exp > 1 {
                 write!(f, " {p}^{exp}")?;
             } else {
                 for _ in 0..*exp {
@@ -151,10 +146,10 @@ fn _factor<A: Arithmetic + miller_rabin::Basis>(num: u64, f: Factors) -> Factors
     _factor(num / divisor, f)
 }
 
-pub fn factor(mut n: u64, print_exponents: bool) -> Factors {
+pub fn factor(mut n: u64) -> Factors {
     #[cfg(feature = "coz")]
     coz::begin!("factorization");
-    let mut factors = Factors::one(print_exponents);
+    let mut factors = Factors::one();
 
     if n < 2 {
         return factors;
@@ -196,25 +191,26 @@ mod tests {
 
     #[test]
     fn factor_2044854919485649() {
-        let f = Factors {
-            decomposition: RefCell::new(Decomposition(smallvec![(503, 1), (2423, 1), (40961, 2)])),
-            print_exponents: false,
-        };
-        assert_eq!(factor(f.product(), false), f);
+        let f = Factors(RefCell::new(Decomposition(smallvec![
+            (503, 1),
+            (2423, 1),
+            (40961, 2)
+        ])));
+        assert_eq!(factor(f.product()), f);
     }
 
     #[test]
     fn factor_recombines_small() {
         assert!((1..10_000)
             .map(|i| 2 * i + 1)
-            .all(|i| factor(i, false).product() == i));
+            .all(|i| factor(i).product() == i));
     }
 
     #[test]
     fn factor_recombines_overflowing() {
         assert!((0..250)
             .map(|i| 2 * i + 2u64.pow(32) + 1)
-            .all(|i| factor(i, false).product() == i));
+            .all(|i| factor(i).product() == i));
     }
 
     #[test]
@@ -226,23 +222,23 @@ mod tests {
         for _ in 0..20 {
             // Repeat the test 20 times, as it only fails some fraction
             // of the time.
-            assert!(factor(pseudoprime, false).product() == pseudoprime);
+            assert!(factor(pseudoprime).product() == pseudoprime);
         }
     }
 
     quickcheck! {
         fn factor_recombines(i: u64) -> bool {
-            i == 0 || factor(i, false).product() == i
+            i == 0 || factor(i).product() == i
         }
 
         fn recombines_factors(f: Factors) -> () {
-            assert_eq!(factor(f.product(), false), f);
+            assert_eq!(factor(f.product()), f);
         }
 
         fn exponentiate_factors(f: Factors, e: Exponent) -> () {
             if e == 0 { return; }
             if let Some(fe) = f.product().checked_pow(e.into()) {
-                assert_eq!(factor(fe, false), f ^ e);
+                assert_eq!(factor(fe), f ^ e);
             }
         }
     }
@@ -256,7 +252,7 @@ use rand::{
 #[cfg(test)]
 impl Distribution<Factors> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Factors {
-        let mut f = Factors::one(false);
+        let mut f = Factors::one();
         let mut g = 1u64;
         let mut n = u64::MAX;
 
@@ -287,7 +283,7 @@ impl Distribution<Factors> for Standard {
 #[cfg(test)]
 impl quickcheck::Arbitrary for Factors {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-        factor(u64::arbitrary(g), false)
+        factor(u64::arbitrary(g))
     }
 }
 
@@ -297,8 +293,8 @@ impl std::ops::BitXor<Exponent> for Factors {
 
     fn bitxor(self, rhs: Exponent) -> Self {
         debug_assert_ne!(rhs, 0);
-        let mut r = Self::one(false);
-        for (p, e) in self.decomposition.borrow().0.iter() {
+        let mut r = Self::one();
+        for (p, e) in self.0.borrow().0.iter() {
             r.add(*p, rhs * e);
         }
 

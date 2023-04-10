@@ -44,7 +44,13 @@ fn print_factors_str(
         .map_err(|e| e.into())
         .and_then(|x| {
             factors_buffer.clear();
-            writeln!(factors_buffer, "{}:{}", x, factor(x, print_exponents))?;
+            // If print_exponents is true, use the alternate format specifier {:#} from fmt to print the factors
+            // of x in the form of p^e.
+            if print_exponents {
+                writeln!(factors_buffer, "{}:{:#}", x, factor(x))?;
+            } else {
+                writeln!(factors_buffer, "{}:{}", x, factor(x))?;
+            }
             w.write_all(factors_buffer.as_bytes())?;
             Ok(())
         })
